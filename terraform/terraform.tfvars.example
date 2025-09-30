@@ -1,0 +1,55 @@
+# Copy this file to terraform.tfvars and customize for your environment
+
+aws_region = "us-west-2"
+project_name = "eks-production"
+environment = "production"
+
+# VPC Configuration
+vpc_cidr = "10.0.0.0/16"
+
+# EKS Configuration
+cluster_version = "1.33"
+
+# Node Groups Configuration
+node_groups = {
+  general = {
+    instance_types = ["t3.medium"]
+    min_size      = 2
+    max_size      = 10
+    desired_size  = 3
+    capacity_type = "ON_DEMAND"
+    labels = {
+      role = "general"
+    }
+    taints = []
+  }
+
+  monitoring = {
+    instance_types = ["t3.large"]
+    min_size      = 1
+    max_size      = 3
+    desired_size  = 2
+    capacity_type = "ON_DEMAND"
+    labels = {
+      role = "monitoring"
+    }
+    taints = [{
+      key    = "monitoring"
+      value  = "true"
+      effect = "NO_SCHEDULE"
+    }]
+  }
+
+  # Optional: Spot instances for cost optimization
+  # spot = {
+  #   instance_types = ["t3.medium", "t3.large"]
+  #   min_size      = 0
+  #   max_size      = 5
+  #   desired_size  = 2
+  #   capacity_type = "SPOT"
+  #   labels = {
+  #     role = "spot"
+  #   }
+  #   taints = []
+  # }
+}
