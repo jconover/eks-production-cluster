@@ -7,13 +7,13 @@ variable "aws_region" {
 variable "project_name" {
   description = "Name of the project"
   type        = string
-  default     = "eks-production"
+  default     = "eks-prod"
 }
 
 variable "environment" {
   description = "Environment name"
   type        = string
-  default     = "production"
+  default     = "prod"
 }
 
 variable "vpc_cidr" {
