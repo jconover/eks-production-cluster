@@ -82,10 +82,10 @@ data "aws_caller_identity" "current" {}
 module "vpc" {
   source = "./modules/vpc"
 
-  project_name         = var.project_name
-  environment          = var.environment
-  vpc_cidr            = var.vpc_cidr
-  availability_zones  = data.aws_availability_zones.available.names
+  project_name       = var.project_name
+  environment        = var.environment
+  vpc_cidr           = var.vpc_cidr
+  availability_zones = data.aws_availability_zones.available.names
 }
 
 module "eks" {
@@ -95,8 +95,8 @@ module "eks" {
   environment     = var.environment
   cluster_version = var.cluster_version
 
-  vpc_id          = module.vpc.vpc_id
-  subnet_ids      = module.vpc.private_subnet_ids
+  vpc_id     = module.vpc.vpc_id
+  subnet_ids = module.vpc.private_subnet_ids
 
   node_groups = var.node_groups
 
@@ -109,9 +109,9 @@ module "monitoring" {
   project_name = var.project_name
   environment  = var.environment
 
-  cluster_name             = module.eks.cluster_name
-  cluster_endpoint         = module.eks.cluster_endpoint
-  cluster_ca_certificate   = module.eks.cluster_certificate_authority_data
+  cluster_name           = module.eks.cluster_name
+  cluster_endpoint       = module.eks.cluster_endpoint
+  cluster_ca_certificate = module.eks.cluster_certificate_authority_data
 
   depends_on = [module.eks]
 }
@@ -122,9 +122,9 @@ module "logging" {
   project_name = var.project_name
   environment  = var.environment
 
-  cluster_name             = module.eks.cluster_name
-  cluster_endpoint         = module.eks.cluster_endpoint
-  cluster_ca_certificate   = module.eks.cluster_certificate_authority_data
+  cluster_name           = module.eks.cluster_name
+  cluster_endpoint       = module.eks.cluster_endpoint
+  cluster_ca_certificate = module.eks.cluster_certificate_authority_data
 
   depends_on = [module.eks]
 }
@@ -135,9 +135,9 @@ module "service_mesh" {
   project_name = var.project_name
   environment  = var.environment
 
-  cluster_name             = module.eks.cluster_name
-  cluster_endpoint         = module.eks.cluster_endpoint
-  cluster_ca_certificate   = module.eks.cluster_certificate_authority_data
+  cluster_name           = module.eks.cluster_name
+  cluster_endpoint       = module.eks.cluster_endpoint
+  cluster_ca_certificate = module.eks.cluster_certificate_authority_data
 
   depends_on = [module.eks]
 }

@@ -32,11 +32,11 @@ variable "node_groups" {
   description = "EKS node groups configuration"
   type = map(object({
     instance_types = list(string)
-    min_size      = number
-    max_size      = number
-    desired_size  = number
-    capacity_type = string
-    labels        = map(string)
+    min_size       = number
+    max_size       = number
+    desired_size   = number
+    capacity_type  = string
+    labels         = map(string)
     taints = list(object({
       key    = string
       value  = string
@@ -46,10 +46,10 @@ variable "node_groups" {
   default = {
     general = {
       instance_types = ["t3.medium"]
-      min_size      = 1
-      max_size      = 10
-      desired_size  = 3
-      capacity_type = "ON_DEMAND"
+      min_size       = 1
+      max_size       = 10
+      desired_size   = 3
+      capacity_type  = "ON_DEMAND"
       labels = {
         role = "general"
       }
@@ -57,10 +57,10 @@ variable "node_groups" {
     }
     monitoring = {
       instance_types = ["t3.large"]
-      min_size      = 1
-      max_size      = 3
-      desired_size  = 2
-      capacity_type = "ON_DEMAND"
+      min_size       = 1
+      max_size       = 3
+      desired_size   = 2
+      capacity_type  = "ON_DEMAND"
       labels = {
         role = "monitoring"
       }
