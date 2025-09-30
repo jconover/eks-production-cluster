@@ -1,0 +1,38 @@
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+tfplan
+
+# Helm
+charts/*/charts/
+charts/*/Chart.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/
+
+# Secrets
+secrets/
+*.pem
+*.key
+*.crt
+
+# Local environment
+.env
+.env.local
