@@ -2,7 +2,7 @@ data "aws_caller_identity" "current" {}
 
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
-  version = "~> 19.15"
+  version = "~> 19.21"
 
   cluster_name    = "${var.project_name}-${var.environment}"
   cluster_version = var.cluster_version
@@ -12,57 +12,28 @@ module "eks" {
   cluster_endpoint_public_access = true
 
   cluster_addons = {
-    coredns = {
-      most_recent = true
+    vpc-cni = {
+      most_recent                 = true
+      resolve_conflicts_on_create = "OVERWRITE"
     }
     kube-proxy = {
-      most_recent = true
-    }
-    vpc-cni = {
-      most_recent = true
+      most_recent                 = true
+      resolve_conflicts_on_create = "OVERWRITE"
     }
     aws-ebs-csi-driver = {
-      most_recent = true
+      most_recent                 = true
+      resolve_conflicts_on_create = "OVERWRITE"
     }
+    # CoreDNS will be installed separately after node groups are ready
   }
 
-  eks_managed_node_groups = {
-    for name, config in var.node_groups : name => {
-      name = "${var.project_name}-${var.environment}-${name}"
+  # Create node groups separately to avoid for_each issues with IAM policies
+  # We'll create them as separate resources below
 
-      instance_types = config.instance_types
-      capacity_type  = config.capacity_type
+  # AWS Auth configuration - disable to avoid ConfigMap conflicts
+  manage_aws_auth_configmap = false
 
-      min_size     = config.min_size
-      max_size     = config.max_size
-      desired_size = config.desired_size
-
-      labels = config.labels
-      taints = config.taints
-
-      # Shorten IAM role name to avoid 38 character limit
-      iam_role_name            = "${var.project_name}-${var.environment}-${name}-ng"
-      iam_role_use_name_prefix = false
-
-      update_config = {
-        max_unavailable_percentage = 33
-      }
-
-      tags = {
-        NodeGroup = name
-      }
-    }
-  }
-
-  manage_aws_auth_configmap = true
-
-  aws_auth_roles = [
-    {
-      rolearn  = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/AWSReservedSSO_AdministratorAccess_*"
-      username = "admin"
-      groups   = ["system:masters"]
-    },
-  ]
+  # We'll create the aws-auth ConfigMap separately after cluster is ready
 
   tags = {
     "karpenter.sh/discovery" = "${var.project_name}-${var.environment}"
@@ -336,7 +307,153 @@ resource "helm_release" "aws_load_balancer_controller" {
   }
 
   depends_on = [
-    module.eks.eks_managed_node_groups,
+    aws_eks_node_group.node_groups,
+    aws_eks_addon.coredns,
     module.aws_load_balancer_controller_irsa
+  ]
+}
+
+# Create IAM role for node groups
+resource "aws_iam_role" "node_group" {
+  name = "${var.project_name}-${var.environment}-node-group-role"
+
+  assume_role_policy = jsonencode({
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "ec2.amazonaws.com"
+      }
+    }]
+    Version = "2012-10-17"
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "node_group_AmazonEKSWorkerNodePolicy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+  role       = aws_iam_role.node_group.name
+}
+
+resource "aws_iam_role_policy_attachment" "node_group_AmazonEKS_CNI_Policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+  role       = aws_iam_role.node_group.name
+}
+
+resource "aws_iam_role_policy_attachment" "node_group_AmazonEC2ContainerRegistryReadOnly" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+  role       = aws_iam_role.node_group.name
+}
+
+# Create node groups using aws_eks_node_group resource directly
+resource "aws_eks_node_group" "node_groups" {
+  for_each = var.node_groups
+
+  cluster_name    = module.eks.cluster_name
+  node_group_name = "${var.project_name}-${each.key}"
+  node_role_arn   = aws_iam_role.node_group.arn
+  subnet_ids      = var.subnet_ids
+
+  capacity_type  = each.value.capacity_type
+  instance_types = each.value.instance_types
+
+  scaling_config {
+    desired_size = each.value.desired_size
+    max_size     = each.value.max_size
+    min_size     = each.value.min_size
+  }
+
+  update_config {
+    max_unavailable_percentage = 33
+  }
+
+  labels = each.value.labels
+
+  dynamic "taint" {
+    for_each = each.value.taints
+    content {
+      key    = taint.value.key
+      value  = taint.value.value
+      effect = taint.value.effect
+    }
+  }
+
+  tags = merge(
+    {
+      Name      = "${var.project_name}-${each.key}"
+      NodeGroup = each.key
+    },
+    {
+      "karpenter.sh/discovery" = "${var.project_name}-${var.environment}"
+    }
+  )
+
+  timeouts {
+    create = "20m"
+    update = "20m"
+    delete = "20m"
+  }
+
+  depends_on = [
+    aws_iam_role_policy_attachment.node_group_AmazonEKSWorkerNodePolicy,
+    aws_iam_role_policy_attachment.node_group_AmazonEKS_CNI_Policy,
+    aws_iam_role_policy_attachment.node_group_AmazonEC2ContainerRegistryReadOnly,
+    module.eks
+  ]
+}
+
+# Install CoreDNS add-on after node groups are ready
+resource "aws_eks_addon" "coredns" {
+  cluster_name             = module.eks.cluster_name
+  addon_name               = "coredns"
+  addon_version            = data.aws_eks_addon_version.coredns.version
+  resolve_conflicts_on_create = "OVERWRITE"
+
+  timeouts {
+    create = "25m"
+    update = "25m"
+    delete = "25m"
+  }
+
+  depends_on = [
+    aws_eks_node_group.node_groups
+  ]
+}
+
+# Get the latest CoreDNS add-on version
+data "aws_eks_addon_version" "coredns" {
+  addon_name         = "coredns"
+  kubernetes_version = module.eks.cluster_version
+  most_recent        = true
+}
+
+# Create aws-auth ConfigMap manually after cluster is ready
+resource "kubernetes_config_map" "aws_auth" {
+  metadata {
+    name      = "aws-auth"
+    namespace = "kube-system"
+  }
+
+  data = {
+    mapRoles = yamlencode([
+      {
+        rolearn  = aws_iam_role.node_group.arn
+        username = "system:node:{{EC2PrivateDNSName}}"
+        groups = [
+          "system:bootstrappers",
+          "system:nodes"
+        ]
+      },
+      {
+        rolearn  = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        username = "admin"
+        groups   = ["system:masters"]
+      }
+    ])
+  }
+
+  depends_on = [
+    module.eks,
+    aws_eks_node_group.node_groups,
+    aws_iam_role.node_group
   ]
 }

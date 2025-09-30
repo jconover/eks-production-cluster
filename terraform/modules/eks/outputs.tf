@@ -45,7 +45,7 @@ output "cluster_security_group_id" {
 
 output "node_groups" {
   description = "EKS node groups"
-  value       = module.eks.eks_managed_node_groups
+  value       = aws_eks_node_group.node_groups
 }
 
 output "oidc_provider_arn" {

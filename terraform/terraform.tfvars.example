@@ -1,6 +1,6 @@
 # Copy this file to terraform.tfvars and customize for your environment
 
-aws_region = "us-west-2"
+aws_region = "us-east-1"
 project_name = "eks"
 environment = "prod"
 
