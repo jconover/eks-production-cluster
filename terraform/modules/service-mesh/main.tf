@@ -1,3 +1,12 @@
+terraform {
+  required_providers {
+    kubectl = {
+      source  = "gavinbunney/kubectl"
+      version = ">= 1.14"
+    }
+  }
+}
+
 resource "kubernetes_namespace" "istio_system" {
   metadata {
     name = "istio-system"
