@@ -40,6 +40,10 @@ module "eks" {
       labels = config.labels
       taints = config.taints
 
+      # Shorten IAM role name to avoid 38 character limit
+      iam_role_name            = "${var.project_name}-${var.environment}-${name}-ng"
+      iam_role_use_name_prefix = false
+
       update_config = {
         max_unavailable_percentage = 33
       }
